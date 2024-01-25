@@ -1,0 +1,93 @@
+# Define the historical average payload sizes for each API endpoint
+HISTORICAL_AVERAGE_PAYLOAD_SIZES = {
+    'https://api.example.com/data1': 1024,
+    'https://api.example.com/data2': 2048
+}
+
+# Define the threshold for significant differences in payload size
+THRESHOLD_SIZE_DIFFERENCE = 256
+
+# Initialize the shared dictionary
+shared_dict = defaultdict(list)
+
+# Define the function to make the API call and log the payload size
+def make_api_call(api_endpoint):
+    # Make the API call and extract the payload size
+    response = requests.get(api_endpoint)
+    payload_size = len(response.content)
+
+    # Write the payload size to the CSV file
+    with open('payload-sizes.csv', 'a') as f:
+        writer = csv.writer(f)
+        writer.writerow([api_endpoint, payload_size])
+
+    # Update the shared dictionary with the payload size
+    shared_dict[api_endpoint].append(payload_size)
+
+    # Calculate the average payload size for each API endpoint
+    average_payload_sizes = [
+        sum(shared_dict[api_endpoint]) / len(shared_dict[api_endpoint])
+        for api_endpoint in API_ENDPOINTS
+    ]
+
+    # Check if there is a significant difference in the payload size
+    for i, api_endpoint in enumerate(API_ENDPOINTS):
+        if len(shared_dict[api_endpoint]) >= 3:
+            HISTORICAL_AVERAGE_PAYLOAD_SIZES[api_endpoint] = average_payload_sizes[i]
+        if abs(average_payload_sizes[i] - HISTORICAL_AVERAGE_PAYLOAD_SIZES[api_endpoint]) > THRESHOLD_SIZE_DIFFERENCE:
+            # Send an alert if there is a significant difference in the payload size
+            print(f'Significant difference in payload size detected for API endpoint {api_endpoint}')
+
+    return response
+
+# Run the Dash app
+app = dash.Dash()
+app.layout = html.Div([
+    html.H1('API Anomaly Detector'),
+    dcc.Graph(id='my-graph')
+])
+
+@app.callback(
+    Output('my-graph', 'figure'),
+    [Input('interval-component', 'n_intervals')]
+)
+def update_graph(n):
+    # Get the payload sizes for each API endpoint
+    payload_sizes = []
+    for api_endpoint in API_ENDPOINTS:
+        # Load the payload sizes from the CSV file
+        with open('payload-sizes.csv', 'r') as f:
+            reader = csv.reader(f)
+            next(reader)  # Skip the header row
+            for row in reader:
+                if row[0] == api_endpoint:
+                    payload_sizes.append(int(row[1]))
+
+    # Calculate the average payload size for each API endpoint
+    average_payload_sizes = [
+        sum(payload_sizes[i::len(API_ENDPOINTS)])
+        for i in range(len(API_ENDPOINTS))
+    ]
+
+    # Create the graph
+    figure = {
+        'data': [{
+            'x': API_ENDPOINTS,
+            'y': average_payload_sizes,
+            'type': 'bar',
+            'name': 'Average Payload Size',
+        }],
+        'layout': {
+            'title': 'Average Payload Size by API Endpoint',
+            'xaxis': {
+                'title': 'API Endpoint',
+            },
+            'yaxis': {
+                'title': 'Average Payload Size',
+            },
+        }
+    }
+
+    return figure
+
+app.run_server(debug=True)
