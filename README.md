@@ -1,4 +1,4 @@
-# APIAnomalyDetector
+# API Anomaly Detector
 
 Not Freely Licensed For Commercial Use! Contact me to use commercially. 
 
